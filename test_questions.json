@@ -1,0 +1,42 @@
+[
+  {
+    "question": "What is retrieval augmented generation (RAG)?",
+    "ground_truth": "RAG is a technique that enhances large language model outputs by first retrieving relevant documents from an external knowledge base, then using those documents as context for generating more accurate and grounded responses."
+  },
+  {
+    "question": "Who proposed the original RAG framework?",
+    "ground_truth": "RAG was proposed by Lewis et al. at Facebook AI Research in 2020."
+  },
+  {
+    "question": "What is the primary cause of hallucination in Large Language Models?",
+    "ground_truth": "Hallucination in LLMs is primarily caused by a lack of relevant domain-specific knowledge in their training data, or relying too heavily on parametric memory without external grounding."
+  },
+  {
+    "question": "How do transformers typically handle long context windows?",
+    "ground_truth": "Transformers handle long contexts by extending the effective context length through modifications such as sparse attention patterns (e.g., Longformer) and positional extrapolation techniques (e.g., ALiBi)."
+  },
+  {
+    "question": "What is the role of attention in neural networks?",
+    "ground_truth": "Attention mechanisms encode contextual relationships between words, allowing the model to weigh the importance of different parts of the input text when processing each word."
+  },
+  {
+    "question": "What is the difference between dense and sparse retrieval?",
+    "ground_truth": "Sparse retrieval (like BM25) usually matches exact keywords in a text index, while dense retrieval uses vector representations of text to find semantically similar meaning even if keywords don't match exactly."
+  },
+  {
+    "question": "How does Reciprocal Rank Fusion (RRF) work?",
+    "ground_truth": "RRF combines multiple ranking lists by calculating a score based on the inverse of a document's rank in each list, allowing different retrieval techniques (like keyword and vector) to be effectively merged."
+  },
+  {
+    "question": "What is the advantage of using in-memory vector databases for prototyping?",
+    "ground_truth": "In-memory vector databases allow developers to test and iterate on embedding storage and retrieval pipelines locally without the overhead of setting up Docker containers or dedicated server infrastructure."
+  },
+  {
+    "question": "Why is it important to overlap text chunks in a RAG system?",
+    "ground_truth": "Overlapping chunks ensures that contextual meaning split across the boundaries of a chunk is preserved, preventing retrieval engines from missing relevant information that might otherwise be cut in half."
+  },
+  {
+    "question": "How does an NLI model measure RAG hallucination?",
+    "ground_truth": "An NLI (Natural Language Inference) model measures hallucination by comparing the generated answer against the retrieved chunks to determine if the answer entails, contradicts, or is neutral to the source documents."
+  }
+]

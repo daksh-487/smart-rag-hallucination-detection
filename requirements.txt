@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+qdrant-client
+sentence-transformers
+rank_bm25
+google-generativeai
+pymupdf
+python-dotenv
+ragas
+streamlit
+transformers
+torch
+pandas
