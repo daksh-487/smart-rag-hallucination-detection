@@ -55,7 +55,7 @@ def log_result(query: str, answer: str, faithfulness_score: float, verdict: str,
             entailment_count, neutral_count, contradiction_count
         ])
 
-    print("✅ Result logged to rag_results_log.csv")
+    print("[SUCCESS] Result logged to rag_results_log.csv")
 
 
 if __name__ == "__main__":

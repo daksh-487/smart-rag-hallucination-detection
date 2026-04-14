@@ -128,7 +128,7 @@ def run_ragas_evaluation(rag_pipeline_func, test_questions_path, output_csv_name
     # 9. Save results to CSV in the root folder
     csv_path = os.path.join(os.path.dirname(__file__), "..", output_csv_name)
     df.to_csv(csv_path, index=False)
-    print(f"\n✅ Detailed evaluation results saved to {csv_path}")
+    print(f"\n[SUCCESS] Detailed evaluation results saved to {csv_path}")
 
     # 10. Return the dataframe
     return df

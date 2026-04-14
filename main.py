@@ -50,11 +50,11 @@ def run_rag(query: str, retriever: HybridRetriever) -> dict:
     
     verdict = detection_result["verdict"]
     if verdict == "HALLUCINATED":
-        print("⚠️  WARNING: This answer may not be supported by your documents. Please verify manually.")
+        print("[WARNING] This answer may not be supported by your documents. Please verify manually.")
     elif verdict == "UNCERTAIN":
-        print("💡 NOTE: This answer is partially supported. Cross-check with the source documents below.")
+        print("[NOTE] This answer is partially supported. Cross-check with the source documents below.")
     elif verdict == "TRUSTED":
-        print("✅ This answer is well supported by the retrieved documents.")
+        print("[SUCCESS] This answer is well supported by the retrieved documents.")
 
     print(f"\nSOURCES: {result['sources']}")
 

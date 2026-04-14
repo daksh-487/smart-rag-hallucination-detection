@@ -5,51 +5,65 @@
 > a production-quality web interface. Built using Google 
 > Antigravity's multi-agent orchestration.
 
-![Smart RAG Demo](static/demo.jpeg)
+## 🌟 Visual Showcase
 
-## Overview
+### Intelligent Dashboard
+The Smart RAG dashboard features a modern, glassmorphic interface designed for clarity and ease of use. It provides real-time system status, RAGAS scores, and query history at a glance.
 
-Most RAG systems retrieve documents and hope the LLM answers 
-correctly. This system goes further — it detects when the model 
-is hallucinating by scoring every generated sentence against the 
-retrieved context using a Natural Language Inference model, 
-flagging answers that aren't grounded in the source documents.
+![Smart RAG Dashboard](assets/home_dashboard.png)
 
-## Architecture
-PDF Documents
-↓
-Ingestion Pipeline (PyMuPDF + Chunking with overlap)
-↓
-Hybrid Retrieval
-├── BM25 Sparse Retrieval (keyword matching)
-├── Dense Vector Search (sentence-transformers BGE)
-└── Reciprocal Rank Fusion (RRF) combination
-↓
-GPT-4o-mini Generation (grounded prompt)
-↓
-NLI Hallucination Detection (DeBERTa-v3)
-├── Sentence-level faithfulness scoring
-├── ENTAILMENT / NEUTRAL / CONTRADICTION labels
-└── Verdict: TRUSTED / UNCERTAIN / HALLUCINATED
-↓
-FastAPI Backend + HTML/CSS/JS Frontend
+---
 
-## Key Features
+### Hallucination Detection in Action
+When a query is executed, the system doesn't just provide an answer; it evaluates the **faithfulness** of the response. Every sentence is cross-referenced with retrieved context to detect hallucinations before they reach the user.
 
-- **Hybrid Retrieval** combining BM25 keyword search and dense 
-  vector search using Reciprocal Rank Fusion — same approach 
-  used in production RAG systems
-- **NLI-based Hallucination Detection** using 
-  cross-encoder/nli-deberta-v3-small to score every sentence 
-  of the generated answer against retrieved context
-- **Sentence-level Breakdown** showing exactly which sentences 
-  are supported, neutral, or contradicted by source documents
-- **Real-time Faithfulness Score** displayed as a color-coded 
-  verdict with progress bar
-- **Result Logging** — every query logged to CSV with timestamp, 
-  score, verdict and sentence counts
-- **Production-quality UI** built with pure HTML/CSS/JS, 
-  connected to FastAPI backend
+![Query Result and Faithfulness Score](assets/query_result.png)
+
+---
+
+### Deep Semantic Analysis
+The system provides a granular breakdown of the generated answer. Each sentence is labeled as **Entailment**, **Neutral**, or **Contradiction**, giving you full transparency into why a specific verdict was reached.
+
+![Sentence Analysis Details](assets/sentence_analysis.png)
+
+---
+
+### Transparent Source Retrieval
+See exactly which documents informed the answer. The system displays retrieved chunks with their **Reciprocal Rank Fusion (RRF)** scores, ensuring you can always verify information at the source.
+
+![Source Retrieval and RRF Scoring](assets/source_retrieval.png)
+
+---
+
+## 📖 Overview
+
+Most RAG systems retrieve documents and hope the LLM answers correctly. This system goes further — it detects when the model is hallucinating by scoring every generated sentence against the retrieved context using a Natural Language Inference (NLI) model, flagging answers that aren't grounded in the source documents.
+
+## 🏗️ Architecture
+
+```mermaid
+graph TD
+    A[PDF Documents] --> B[Ingestion Pipeline]
+    B --> C[Hybrid Retrieval]
+    C --> D{Reciprocal Rank Fusion}
+    D --> E[BM25 Sparse]
+    D --> F[Dense Vector Search]
+    E --> G[GPT-4o-mini Generation]
+    F --> G
+    G --> H[NLI Hallucination Detection]
+    H --> I[Sentence-level Faithfulness]
+    I --> J[Verdict: TRUSTED / UNCERTAIN / HALLUCINATED]
+    J --> K[FastAPI Backend + JS Frontend]
+```
+
+## 🚀 Key Features
+
+- **Hybrid Retrieval** combining BM25 keyword search and dense vector search using Reciprocal Rank Fusion — same approach used in production RAG systems.
+- **NLI-based Hallucination Detection** using `deberta-v3-small` to score every sentence of the generated answer against retrieved context.
+- **Sentence-level Breakdown** showing exactly which sentences are supported, neutral, or contradicted by source documents.
+- **Real-time Faithfulness Score** displayed as a color-coded verdict with progress bar.
+- **Result Logging** — every query logged to CSV with timestamp, score, verdict, and sentence counts.
+- **Production-quality UI** built with pure HTML/CSS/JS, connected to a robust FastAPI backend.
 
 ## Tech Stack
 
