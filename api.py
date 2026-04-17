@@ -1,3 +1,4 @@
+import csv
 from openai import OpenAI
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
@@ -26,13 +27,14 @@ app.add_middleware(
 retriever = None
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-@app.on_event("startup")
-def startup_event():
-    """Build the RAG pipeline into memory when the server starts."""
+def get_retriever():
+    """Lazy loader for the RAG pipeline."""
     global retriever, client
-    print("\n--- Initializing Smart RAG Backend (API-driven) ---")
-    retriever = build_pipeline(client)
-    print("--- Backend Initialization Complete ---\n")
+    if retriever is None:
+        print("\n--- Initializing Smart RAG Backend (Lazy Loading) ---")
+        retriever = build_pipeline(client)
+        print("--- Backend Initialization Complete ---\n")
+    return retriever
 
 
 class QueryRequest(BaseModel):
@@ -60,7 +62,7 @@ def get_status():
     return {
         "status": "online",
         "documents": pdf_count,
-        "chunks": 0, # Placeholder
+        "chunks": "Ready" if retriever else "Indexing on first query",
         "model": "GPT-4o-mini",
         "retrieval": "Hybrid RRF (OpenAI Embeddings)"
     }
@@ -72,13 +74,16 @@ def handle_query(request: QueryRequest):
     Core RAG endpoint. Runs the query, evaluates hallucination,
     and returns formatted structured data.
     """
-    global retriever, client
-    if not retriever:
-        raise HTTPException(status_code=500, detail="Pipeline not initialized.")
+    global client
+    try:
+        active_retriever = get_retriever()
+    except Exception as e:
+        print(f"FAILED TO BUILD PIPELINE: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to initialize RAG pipeline: {str(e)}")
 
     # run_rag natively runs semantic chunk retrieval, LLM generation, 
     # and NLI hallucination detector sequentially!
-    result = run_rag(request.query, retriever, client)
+    result = run_rag(request.query, active_retriever, client)
 
     # Re-structure the output specifically for the frontend UI
     formatted_sources = []
@@ -108,19 +113,18 @@ def get_history():
         return []
         
     try:
-        import pandas as pd
-        df = pd.read_csv(log_file)
-        if df.empty:
-            return []
-            
-        recent = df.tail(5)
         history = []
-        for _, row in recent.iterrows():
-            history.append({
-                "query": row["query"],
-                "faithfulness_score": row["faithfulness_score"],
-                "verdict": row["verdict"]
-            })
+        with open(log_file, mode="r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
+            # Take last 5
+            recent = rows[-5:]
+            for row in recent:
+                history.append({
+                    "query": row["query"],
+                    "faithfulness_score": float(row["faithfulness_score"]),
+                    "verdict": row["verdict"]
+                })
             
         # Reverse to return newest logs first
         return history[::-1]

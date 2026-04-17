@@ -4,8 +4,6 @@ Smart RAG System - Complete pipeline: Load → Chunk → Retrieve → Generate
 
 import os
 import sys
-import pandas as pd
-
 from openai import OpenAI
 from ingestion.document_loader import load_pdfs
 from ingestion.chunker import chunk_documents
@@ -97,7 +95,10 @@ def build_pipeline(openai_client: OpenAI):
     Returns the HybridRetriever ready for queries.
     """
     # Step 1: Load PDFs
-    raw_folder = os.path.join(".", "data", "raw")
+    # Use absolute path to the data folder
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    raw_folder = os.path.join(base_dir, "data", "raw")
+    
     documents = load_pdfs(raw_folder)
     print(f"\nPages loaded: {len(documents)}")
 
@@ -141,35 +142,33 @@ if __name__ == "__main__":
     print(f"{'=' * 70}")
 
     print("\n--- RESULTS SUMMARY ---")
-    log_path = os.path.join(os.path.dirname(__file__), "rag_results_log.csv")
+    log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "rag_results_log.csv")
     if os.path.exists(log_path):
-        df = pd.read_csv(log_path)
-        recent_df = df.tail(5).copy()
-        recent_df["query_truncated"] = recent_df["query"].str[:50]
-        
-        print("\nLast 5 Queries:")
-        print(recent_df[["query_truncated", "faithfulness_score", "verdict"]].to_string(index=False))
-        
-        avg_score = recent_df["faithfulness_score"].mean()
-        print(f"\nAverage Faithfulness Score (Last 5): {avg_score:.3f}")
-    else:
-        print("No log file found.")
-
-    print(f"\n{'=' * 70}")
-    print("RAG pipeline complete!")
-    print(f"{'=' * 70}")
-
-    print("\n--- RESULTS SUMMARY ---")
-    log_path = os.path.join(os.path.dirname(__file__), "rag_results_log.csv")
-    if os.path.exists(log_path):
-        df = pd.read_csv(log_path)
-        recent_df = df.tail(5).copy()
-        recent_df["query_truncated"] = recent_df["query"].str[:50]
-        
-        print("\nLast 5 Queries:")
-        print(recent_df[["query_truncated", "faithfulness_score", "verdict"]].to_string(index=False))
-        
-        avg_score = recent_df["faithfulness_score"].mean()
-        print(f"\nAverage Faithfulness Score (Last 5): {avg_score:.3f}")
+        import csv
+        try:
+            with open(log_path, mode="r", encoding="utf-8") as f:
+                reader = csv.DictReader(f)
+                rows = list(reader)
+                recent = rows[-5:]
+                
+                print("\nLast 5 Queries:")
+                header = f"{'Query':<50} | {'Score':<6} | {'Verdict'}"
+                print(header)
+                print("-" * len(header))
+                
+                scores = []
+                for row in recent:
+                    q_trunc = (row["query"][:47] + "...") if len(row["query"]) > 50 else row["query"]
+                    try:
+                        score = float(row["faithfulness_score"])
+                        scores.append(score)
+                    except (ValueError, TypeError):
+                        score = 0.0
+                    print(f"{q_trunc:<50} | {score:<6.3f} | {row['verdict']}")
+                
+                if scores:
+                    print(f"\nAverage Faithfulness Score (Last 5): {sum(scores)/len(scores):.3f}")
+        except Exception as e:
+            print(f"Error reading summary: {e}")
     else:
         print("No log file found.")
