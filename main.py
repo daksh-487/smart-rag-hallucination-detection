@@ -6,8 +6,7 @@ import os
 import sys
 import pandas as pd
 
-from sentence_transformers import SentenceTransformer
-
+from openai import OpenAI
 from ingestion.document_loader import load_pdfs
 from ingestion.chunker import chunk_documents
 from retrieval.hybrid_retriever import HybridRetriever
@@ -16,13 +15,14 @@ from evaluation.hallucination_detector import score_faithfulness
 from evaluation.logger import log_result
 
 
-def run_rag(query: str, retriever: HybridRetriever) -> dict:
+def run_rag(query: str, retriever: HybridRetriever, openai_client: OpenAI) -> dict:
     """
     Runs the full RAG pipeline for a given query using a pre-built retriever.
 
     Args:
         query: The user's question.
         retriever: A pre-built HybridRetriever instance.
+        openai_client: An initialized OpenAI client instance.
 
     Returns:
         The result dictionary from generate_answer.
@@ -33,8 +33,8 @@ def run_rag(query: str, retriever: HybridRetriever) -> dict:
     # Step 2: Generate answer using OpenAI
     result = generate_answer(query, retrieved_chunks)
 
-    # Step 3: Run hallucination detection
-    detection_result = score_faithfulness(result["answer"], retrieved_chunks)
+    # Step 3: Run hallucination detection using LLM judge
+    detection_result = score_faithfulness(result["answer"], retrieved_chunks, openai_client)
 
     # Step 4: Print results
     print(f"\n{'=' * 70}")
@@ -91,7 +91,7 @@ def run_rag(query: str, retriever: HybridRetriever) -> dict:
     }
 
 
-def build_pipeline():
+def build_pipeline(openai_client: OpenAI):
     """
     Builds the RAG pipeline: loads PDFs, chunks them, and creates the retriever.
     Returns the HybridRetriever ready for queries.
@@ -105,22 +105,24 @@ def build_pipeline():
     chunks = chunk_documents(documents)
     print(f"Chunks created: {len(chunks)}\n")
 
-    # Step 3: Load embedding model
-    print("Loading embedding model 'all-MiniLM-L6-v2'...")
-    model = SentenceTransformer("all-MiniLM-L6-v2")
-
-    # Step 4: Create hybrid retriever
-    retriever = HybridRetriever(chunks, model)
+    # Step 3: Create hybrid retriever (now uses OpenAI for embeddings)
+    retriever = HybridRetriever(chunks, openai_client)
 
     return retriever
 
 
 if __name__ == "__main__":
-    print("RAG system starting...")
+    from dotenv import load_dotenv
+    load_dotenv()
+    
+    print("RAG system starting (API-driven)...")
     print("=" * 70)
 
-    # Build the pipeline once (expensive step)
-    retriever = build_pipeline()
+    # Initialize OpenAI client
+    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+    # Build the pipeline once
+    retriever = build_pipeline(client)
 
     # Run 5 test queries
     queries = [
@@ -132,7 +134,26 @@ if __name__ == "__main__":
     ]
 
     for query in queries:
-        run_rag(query, retriever)
+        run_rag(query, retriever, client)
+
+    print(f"\n{'=' * 70}")
+    print("RAG pipeline complete!")
+    print(f"{'=' * 70}")
+
+    print("\n--- RESULTS SUMMARY ---")
+    log_path = os.path.join(os.path.dirname(__file__), "rag_results_log.csv")
+    if os.path.exists(log_path):
+        df = pd.read_csv(log_path)
+        recent_df = df.tail(5).copy()
+        recent_df["query_truncated"] = recent_df["query"].str[:50]
+        
+        print("\nLast 5 Queries:")
+        print(recent_df[["query_truncated", "faithfulness_score", "verdict"]].to_string(index=False))
+        
+        avg_score = recent_df["faithfulness_score"].mean()
+        print(f"\nAverage Faithfulness Score (Last 5): {avg_score:.3f}")
+    else:
+        print("No log file found.")
 
     print(f"\n{'=' * 70}")
     print("RAG pipeline complete!")

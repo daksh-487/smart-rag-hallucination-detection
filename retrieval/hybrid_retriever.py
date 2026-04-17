@@ -9,7 +9,7 @@ import sys
 # Ensure the project root is in the path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from sentence_transformers import SentenceTransformer
+from openai import OpenAI
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, PointStruct
 
@@ -24,16 +24,17 @@ class HybridRetriever:
     using Reciprocal Rank Fusion (RRF) to produce final rankings.
     """
 
-    def __init__(self, chunks: list[dict], embedding_model: SentenceTransformer):
+    def __init__(self, chunks: list[dict], openai_client: OpenAI):
         """
         Initializes both BM25 and vector retrieval pipelines.
 
         Args:
             chunks: List of chunk dictionaries from chunk_documents().
-            embedding_model: A loaded SentenceTransformer model.
+            openai_client: An initialized OpenAI client instance.
         """
         self.chunks = chunks
-        self.model = embedding_model
+        self.client = openai_client
+        self.embedding_model = "text-embedding-3-small"
 
         # Build a chunk_id -> chunk lookup for fast access
         self.chunk_lookup = {chunk["chunk_id"]: chunk for chunk in chunks}
@@ -42,29 +43,38 @@ class HybridRetriever:
         self.bm25_retriever = BM25Retriever(chunks)
 
         # Step 2: Create in-memory Qdrant client and embed all chunks
-        self.client = QdrantClient(":memory:")
+        self.qdrant = QdrantClient(":memory:")
         self.collection_name = "rag_documents"
 
-        self.client.create_collection(
+        self.qdrant.create_collection(
             collection_name=self.collection_name,
             vectors_config=VectorParams(
-                size=384,  # all-MiniLM-L6-v2 output dimension
+                size=1536,  # OpenAI text-embedding-3-small dimension
                 distance=Distance.COSINE,
             ),
         )
 
-        # Embed all chunks in batches of 32
-        print(f"Embedding {len(chunks)} chunks for vector index...")
+        # Embed all chunks in batches
+        print(f"Embedding {len(chunks)} chunks via OpenAI {self.embedding_model}...")
         texts = [chunk["chunk_text"] for chunk in chunks]
-        embeddings = self.model.encode(texts, batch_size=32, show_progress_bar=True)
+        
+        all_embeddings = []
+        batch_size = 100
+        for i in range(0, len(texts), batch_size):
+            batch = texts[i : i + batch_size]
+            response = self.client.embeddings.create(
+                input=batch,
+                model=self.embedding_model
+            )
+            all_embeddings.extend([data.embedding for data in response.data])
 
         # Upsert into Qdrant
         points = []
-        for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
+        for i, (chunk, embedding) in enumerate(zip(chunks, all_embeddings)):
             points.append(
                 PointStruct(
                     id=i,
-                    vector=embedding.tolist(),
+                    vector=embedding,
                     payload={
                         "chunk_text": chunk["chunk_text"],
                         "source": chunk["source"],
@@ -76,12 +86,12 @@ class HybridRetriever:
 
         # Upsert in batches of 100
         for start in range(0, len(points), 100):
-            self.client.upsert(
+            self.qdrant.upsert(
                 collection_name=self.collection_name,
                 points=points[start : start + 100],
             )
 
-        print(f"HybridRetriever ready with {len(chunks)} chunks")
+        print(f"HybridRetriever ready with {len(chunks)} chunks (API-driven)")
 
     def search(self, query: str, top_k: int = 5) -> list[dict]:
         """
@@ -102,8 +112,13 @@ class HybridRetriever:
             bm25_ranks[result["chunk_id"]] = rank
 
         # Step 2: Vector search — embed query and search Qdrant top 20
-        query_embedding = self.model.encode(query).tolist()
-        vector_results = self.client.query_points(
+        response = self.client.embeddings.create(
+            input=[query],
+            model=self.embedding_model
+        )
+        query_embedding = response.data[0].embedding
+
+        vector_results = self.qdrant.query_points(
             collection_name=self.collection_name,
             query=query_embedding,
             limit=20,
@@ -139,6 +154,9 @@ class HybridRetriever:
 
 
 if __name__ == "__main__":
+    from dotenv import load_dotenv
+    load_dotenv()
+    
     # Load and chunk PDFs
     raw_folder = os.path.join(".", "data", "raw")
     documents = load_pdfs(raw_folder)
@@ -147,12 +165,11 @@ if __name__ == "__main__":
     chunks = chunk_documents(documents)
     print(f"Chunks created: {len(chunks)}\n")
 
-    # Load embedding model
-    print("Loading embedding model 'all-MiniLM-L6-v2'...")
-    model = SentenceTransformer("all-MiniLM-L6-v2")
+    # Initialize OpenAI client
+    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
     # Create hybrid retriever
-    retriever = HybridRetriever(chunks, model)
+    retriever = HybridRetriever(chunks, client)
 
     # Test queries
     queries = [

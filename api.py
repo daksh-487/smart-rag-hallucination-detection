@@ -1,17 +1,12 @@
-"""
-FastAPI Backend for Smart RAG
-Serves endpoints for queries, status, and history.
-"""
-
-import os
-# Prevent huggingface tokenizers threading deadlock on Windows FastAPI!
-os.environ["TOKENIZERS_PARALLELISM"] = "false"
-
-import pandas as pd
+from openai import OpenAI
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from dotenv import load_dotenv
+
+# Load env vars
+load_dotenv()
 
 # Import pipeline elements
 from main import build_pipeline, run_rag
@@ -29,13 +24,14 @@ app.add_middleware(
 
 # Global variables to hold the RAG pipeline components
 retriever = None
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 @app.on_event("startup")
 def startup_event():
     """Build the RAG pipeline into memory when the server starts."""
-    global retriever
-    print("\n--- Initializing Smart RAG Backend ---")
-    retriever = build_pipeline()
+    global retriever, client
+    print("\n--- Initializing Smart RAG Backend (API-driven) ---")
+    retriever = build_pipeline(client)
     print("--- Backend Initialization Complete ---\n")
 
 
@@ -66,7 +62,7 @@ def get_status():
         "documents": pdf_count,
         "chunks": 0, # Placeholder
         "model": "GPT-4o-mini",
-        "retrieval": "Hybrid RRF"
+        "retrieval": "Hybrid RRF (OpenAI Embeddings)"
     }
 
 
@@ -76,13 +72,13 @@ def handle_query(request: QueryRequest):
     Core RAG endpoint. Runs the query, evaluates hallucination,
     and returns formatted structured data.
     """
-    global retriever
+    global retriever, client
     if not retriever:
         raise HTTPException(status_code=500, detail="Pipeline not initialized.")
 
     # run_rag natively runs semantic chunk retrieval, LLM generation, 
-    # and NLI hallucination detector (score_faithfulness) sequentially!
-    result = run_rag(request.query, retriever)
+    # and NLI hallucination detector sequentially!
+    result = run_rag(request.query, retriever, client)
 
     # Re-structure the output specifically for the frontend UI
     formatted_sources = []
@@ -112,6 +108,7 @@ def get_history():
         return []
         
     try:
+        import pandas as pd
         df = pd.read_csv(log_file)
         if df.empty:
             return []
