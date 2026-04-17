@@ -36,26 +36,34 @@ def log_result(query: str, answer: str, faithfulness_score: float, verdict: str,
     rounded_score = round(faithfulness_score, 3)
     num_sentences = len(sentence_scores)
 
-    # Write to CSV
-    with open(csv_path, mode="a", newline="", encoding="utf-8") as csvfile:
-        writer = csv.writer(csvfile)
+    # On Vercel, the filesystem is read-only, so we skip file logging
+    if os.environ.get("VERCEL"):
+        print(f"[INFO] Skipping file logging on Vercel for query: {query[:30]}...")
+        return
 
-        # Write header if new file
-        if not file_exists:
+    try:
+        # Write to CSV
+        with open(csv_path, mode="a", newline="", encoding="utf-8") as csvfile:
+            writer = csv.writer(csvfile)
+
+            # Write header if new file
+            if not file_exists:
+                writer.writerow([
+                    "timestamp", "query", "answer", "faithfulness_score", 
+                    "verdict", "sources", "num_sentences", 
+                    "entailment_count", "neutral_count", "contradiction_count"
+                ])
+
+            # Write data row
             writer.writerow([
-                "timestamp", "query", "answer", "faithfulness_score", 
-                "verdict", "sources", "num_sentences", 
-                "entailment_count", "neutral_count", "contradiction_count"
+                timestamp, query, clean_answer, rounded_score,
+                verdict, sources_str, num_sentences,
+                entailment_count, neutral_count, contradiction_count
             ])
 
-        # Write data row
-        writer.writerow([
-            timestamp, query, clean_answer, rounded_score,
-            verdict, sources_str, num_sentences,
-            entailment_count, neutral_count, contradiction_count
-        ])
-
-    print("[SUCCESS] Result logged to rag_results_log.csv")
+        print("[SUCCESS] Result logged to rag_results_log.csv")
+    except Exception as e:
+        print(f"[WARNING] Could not log result to CSV: {e}")
 
 
 if __name__ == "__main__":
