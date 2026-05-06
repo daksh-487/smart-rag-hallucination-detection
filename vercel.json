@@ -1,19 +1,10 @@
 {
-  "builds": [
-    {
-      "src": "api.py",
-      "use": "@vercel/python"
-    }
-  ],
-  "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "api.py"
-    }
-  ],
-  "functions": {
-    "api.py": {
-      "maxDuration": 60
-    }
-  }
+    "functions": {
+          "api.py": {
+                  "maxDuration": 60
+          }
+    },
+    "rewrites": [
+          { "source": "/(.*)", "destination": "api.py" }
+    ]
 }
