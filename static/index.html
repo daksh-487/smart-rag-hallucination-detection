@@ -210,6 +210,22 @@
         .btn-search:hover:not(:disabled) { background: #0c5a45; }
         .btn-search:disabled { background: #ccc; box-shadow: none; cursor: not-allowed; }
 
+        .btn-upload {
+            background: transparent;
+            color: var(--primary);
+            border: 1px solid var(--primary);
+            padding: 14px 24px;
+            border-radius: 99px;
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: var(--transition-smooth);
+            font-family: 'Inter', sans-serif;
+            white-space: nowrap;
+        }
+        .btn-upload:hover:not(:disabled) { background: rgba(15, 110, 86, 0.05); }
+        .btn-upload:disabled { border-color: #ccc; color: #ccc; cursor: not-allowed; }
+
         /* Content Area */
         .content-area { 
             padding: 40px; 
@@ -475,6 +491,8 @@
                        onkeydown="if(event.key === 'Enter') executeQuery()">
             </div>
             <button class="btn-search" onclick="executeQuery()">Search</button>
+            <button class="btn-upload" onclick="document.getElementById('doc-upload').click()">Upload PDF</button>
+            <input type="file" id="doc-upload" accept=".pdf" style="display: none;" onchange="uploadDocument(event)">
         </header>
 
         <div class="content-area">
@@ -553,13 +571,45 @@
     </main>
 
     <script>
-        const API_URL = "http://localhost:8000";
+        const API_URL = "";
 
         // Initialization
         window.addEventListener('DOMContentLoaded', () => {
             fetchStatus();
             fetchHistory();
         });
+
+        async function uploadDocument(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const btn = document.querySelector('.btn-upload');
+            const originalText = "Upload PDF";
+            btn.disabled = true;
+            btn.innerText = "Uploading...";
+
+            const formData = new FormData();
+            formData.append("file", file);
+
+            try {
+                const res = await fetch(`${API_URL}/upload`, {
+                    method: 'POST',
+                    body: formData
+                });
+                if (!res.ok) throw new Error("Upload failed");
+                btn.innerText = "Uploaded!";
+                fetchStatus(); // update docs count
+            } catch (err) {
+                console.error(err);
+                btn.innerText = "Error";
+            } finally {
+                setTimeout(() => {
+                    btn.disabled = false;
+                    btn.innerText = originalText;
+                    event.target.value = ''; // Reset input
+                }, 3000);
+            }
+        }
 
         function copyAnswer() {
             const answerText = document.getElementById('ans-text').innerText;
@@ -578,8 +628,14 @@
                 const data = await res.json();
                 document.getElementById('s-status').innerText = 'Online';
                 document.getElementById('s-status').className = 'pill trusted';
-                document.getElementById('s-docs').innerText = data.documents;
-                document.getElementById('s-chunks').innerText = data.chunks > 0 ? data.chunks : 'Ready';
+                
+                let docName = data.document;
+                if (docName && docName.length > 20) {
+                    docName = docName.substring(0, 20) + '...';
+                }
+                document.getElementById('s-docs').innerText = docName;
+                document.getElementById('s-docs').title = data.document; // full name on hover
+                document.getElementById('s-chunks').innerText = data.chunks > 0 ? data.chunks : 'None';
                 document.getElementById('s-retrieval').innerText = data.retrieval;
                 document.getElementById('s-model').innerText = data.model;
             } catch (err) {

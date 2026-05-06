@@ -6,3 +6,4 @@ pymupdf
 python-dotenv
 openai
 rank_bm25
+python-multipart
